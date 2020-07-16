@@ -4,9 +4,23 @@ class School {
     this.wins = wins;
     this.lat = lat;
     this.long = long;
+    this.firstWin = this.wins[0];
     this.weight = 0;
-    this.lastWin = 0;
   }
+
+  lastWin(year){
+    var mostRecent = 0;
+    for (let j=0; j<this.wins.length; j++){
+      if (this.wins[j] <= year) mostRecent = this.wins[j];
+    }
+    return year - mostRecent;
+  }
+
+  getWeight(year){
+    weightedCenter(year);
+    return this.weight;
+  }
+
 }
 
 var schools = [new School('Princeton', [1869, 1870, 1872, 1873, 1874, 1875, 1877, 1878, 1879, 1880, 1881, 1884, 1885, 1886, 1889, 1893, 1896, 1898, 1899, 1903, 1906, 1911, 1920, 1922, 1933, 1935], 40.342694, -74.654704),
@@ -85,19 +99,6 @@ function weightedCenter(year){
   return [wgtMeanLat, wgtMeanLong];
 }
 
-function lastWins(year){
-  for (let i=0; i<schools.length; i++){
-    var mostRecent = 0;
-    for (let j=0; j<schools[i].wins.length; j++){
-      if (schools[i].wins[j] <= year) mostRecent = schools[i].wins[j];
-    }
-    schools[i].lastWin = year - mostRecent;
-  }
-}
-var year = 2019;
-var center = weightedCenter(year);
-lastWins(year);
-
 
 
 
@@ -105,16 +106,15 @@ require(["esri/Map",
          "esri/views/SceneView",
          "esri/layers/FeatureLayer",
          "esri/Graphic",
-         "esri/geometry/Point"],
-         function (Map, SceneView, FeatureLayer, Graphic, Point) {
+         "esri/geometry/Point",
+         "esri/widgets/Slider"],
+         function (Map, SceneView, FeatureLayer, Graphic, Point, Slider) {
+
+           // Create layers
 
            function createSchoolLayer(){
-             graphics = []
-             for (let i=0; i<schools.length; i++){
-               graphics.push(schoolToGraphic(schools[i]));
-             }
              return new FeatureLayer({
-               source: graphics,
+               source: getSchoolGraphics(),
                fields: [{
                 name: "ObjectID",
                 alias: "ObjectID",
@@ -127,40 +127,27 @@ require(["esri/Map",
                 name: "WEIGHT",
                 alias: "WEIGHT",
                 type: "double"
+              }, {
+                name: "YEAR",
+                alias: "YEAR",
+                type: "double"
               }],
               objectIdField: "ObjectID",
-              geometryType: "point",
-              renderer: schoolRenderer
+              geometryType: "point"
             })
            }
 
-           function createCenterLayer(){
-             graphics = [];
-             graphics.push(centerToGraphic(center));
-             return new FeatureLayer({
-               source: graphics,
-               fields: [{
-                name: "ObjectID",
-                alias: "ObjectID",
-                type: "oid"
-              }],
-              objectIdField: "ObjectID",
-              geometryType: "point",
-              renderer: centerRenderer
-            })
+           function getSchoolGraphics(){
+             graphics = []
+             for (let i=0; i<schools.length; i++){
+               for (let j=schools[i].firstWin; j< 2020; j++){
+                 graphics.push(schoolToGraphic(schools[i], j));
+               }
+             }
+             return graphics;
            }
 
-           function centerToGraphic(center){
-             const location = new Point({
-               latitude: center[0],
-               longitude: center[1]
-             });
-             return new Graphic({
-               geometry: location
-             })
-           }
-
-           function schoolToGraphic(school){
+           function schoolToGraphic(school, value){
              const location = new Point({
                latitude: school.lat,
                longitude: school.long
@@ -168,84 +155,64 @@ require(["esri/Map",
              return new Graphic({
                geometry: location,
                attributes: {
-                 LASTWIN: school.lastWin,
-                 WEIGHT: school.weight
+                 LASTWIN: school.lastWin(value),
+                 WEIGHT: school.getWeight(value),
+                 YEAR: value
                },
-               LASTWIN: school.lastWin,
-               WEIGHT: school.weight
+               LASTWIN: school.lastWin(value),
+               WEIGHT: school.getWeight(value),
+               YEAR: value
              })
            }
 
-           var centerRenderer = {
-             type: "simple",
-             symbol: {
-               type: "simple-marker",
-               color: [0, 255, 0],
-               size: "10px",
-               outline: {
-                 color: [0, 150, 0],
-                 width: 1
-               }
-             },
-             label: "center location"
-           };
+           function getCenterGraphics(){
+             graphics = []
+             for (let i=1869; i<2020; i++){
+               graphics.push(centerToGraphic(weightedCenter(i), i));
+             }
+             return graphics;
+           }
 
-           var schoolRenderer = {
-            type: "simple",
-            symbol: {
-              type: "point-3d",
-              symbolLayers: [
-                {
-                  type: "object",
-                  resource: {
-                    primitive: "cylinder"
-                  },
-                  width: 40000 // width of the symbol in meters
-                }
-              ]
-            },
-            label: "school location",
-            visualVariables: [
-              {
-                type: "color",
-                field: "LASTWIN",
-                stops: [
-                  {
-                    value: 0,
-                    color: "red"
-                  },
-                  {
-                    value: 115,
-                    color: "blue"
-                  }
-                ]
-              },
-              {
-                type: "size",
-                field: "WEIGHT",
-                stops: [
-                  {
-                    value: 0,
-                    size: 20000
-                  },
-                  {
-                    value: 18,
-                    size: 900000
-                  }
-                ],
-                axis: "height"
-              },
-              {
-                type: "size",
-                axis: "width-and-depth",
-                useSymbolValue: true
-              }
-            ],
-          };
+           function createCenterLayer(){
+             return new FeatureLayer({
+               source: getCenterGraphics(),
+               fields: [{
+                name: "ObjectID",
+                alias: "ObjectID",
+                type: "oid"
+              }, {
+                name: "YEAR",
+                alias: "YEAR",
+                type: "double"
+              }],
+              objectIdField: "ObjectID",
+              geometryType: "point",
+              elevationInfo: {mode: "on-the-ground"}
+            })
+           }
+
+           function centerToGraphic(center, value){
+             const location = new Point({
+               latitude: center[0],
+               longitude: center[1]
+             });
+             return new Graphic({
+               geometry: location,
+               attributes: {
+                 YEAR: value
+               },
+               YEAR: value
+             })
+           }
+
+
+           // map and view setup
+           var schoolLayer = createSchoolLayer();
+           var centerLayer = createCenterLayer();
 
            var map = new Map({
              basemap: "gray-vector",
-             layers: [createSchoolLayer(), createCenterLayer()]
+             layers: [schoolLayer, centerLayer]
            });
 
            var view = new SceneView({
@@ -253,8 +220,230 @@ require(["esri/Map",
              map: map,
              ground: "world-elevation",
              center: [-90.90614554667947, 38.44811777828268], // longitude, latitude
-             zoom: 4.288933173289792
+             zoom: 4.35
            });
 
+           // UI setup
+
+           var applicationDiv = document.getElementById("applicationDiv");
+           var sliderValue = document.getElementById("sliderValue");
+           var playButton = document.getElementById("playButton");
+           var titleDiv = document.getElementById("titleDiv");
+           var animation = null;
+
+           var slider = new Slider({
+             container: "slider",
+             min: 1869,
+             max: 2019,
+             values: [1869],
+             step: 1,
+             visibleElements: {
+               rangeLabels: true
+             }
+           });
+
+           // When user drags the slider:
+           //  - stops the animation
+           //  - set the visualized year to the slider one.
+           function inputHandler(event){
+             stopAnimation();
+             setYear(event.value);
+           }
+           slider.on("thumb-drag", inputHandler);
+
+           // Toggle animation on/off when user
+           // clicks on the play button
+           playButton.addEventListener("click", function (){
+             if (playButton.classList.contains("toggled")){
+               stopAnimation();
+             } else {
+               startAnimation();
+             }
+           });
+
+           // first year to visualize
+           setYear(1869);
+
+           // methods
+           function setYear(value){
+             sliderValue.innerHTML = Math.floor(value);
+             slider.viewModel.setValue(0, value);
+             schoolLayer.renderer = createSchoolRenderer(value);
+             centerLayer.renderer = createCenterRenderer(value);
+           }
+
+           function createSchoolRenderer(year){
+             return {
+              type: "simple",
+              symbol: {
+                type: "point-3d",
+                symbolLayers: [
+                  {
+                    type: "object",
+                    resource: {
+                      primitive: "cylinder"
+                    },
+                    width: 40000 // width of the symbol in meters
+                  }
+                ]
+              },
+              label: "school location",
+              visualVariables: [
+                {
+                  type: "opacity",
+                  field: "YEAR",
+                  stops: [
+                    {
+                      opacity: 0,
+                      value: year - 0.1
+                    },
+                    {
+                      opacity: 1,
+                      value: year
+                    },
+                    {
+                      opacity: 0,
+                      value: year + 0.1
+                    }
+                  ]
+                },
+                {
+                  type: "color",
+                  field: "LASTWIN",
+                  stops: [
+                    {
+                      value: 0,
+                      color: [0, 255, 0]
+                    },
+                    {
+                      value: 5,
+                      color: [255, 255, 0]
+                    },
+                    {
+                      value: 50,
+                      color: [255, 100, 0]
+                    },
+                    {
+                      value: 115,
+                      color: [255, 0, 0]
+                    }
+                  ]
+                },
+                {
+                  type: "size",
+                  field: "WEIGHT",
+                  stops: [
+                    {
+                      value: 0,
+                      size: 20000
+                    },
+                    {
+                      value: 18,
+                      size: 900000
+                    }
+                  ],
+                  axis: "height"
+                },
+                {
+                  type: "size",
+                  axis: "width-and-depth",
+                  useSymbolValue: true
+                }
+              ],
+            }
+           }
+
+           function createCenterRenderer(year){
+             return {
+               type: "simple",
+               symbol: {
+                 type: "point-3d",
+                 symbolLayers: [
+                   {
+                     type: "icon",
+                     size: 8,
+                     resource: {primitive: "circle"},
+                     material: {color: "green"}
+                  }
+                 ]
+               },
+               label: "center location",
+               visualVariables: [
+                 {
+                   type: "opacity",
+                   field: "YEAR",
+                   stops: [
+                     {
+                       opacity: 0,
+                       value: year - 0.1
+                     },
+                     {
+                       opacity: 1,
+                       value: year
+                     },
+                     {
+                       opacity: 0,
+                       value: year + 0.1
+                     }
+                   ]
+                 }
+               ]
+             }
+           }
+
+           // animation
+
+           function startAnimation() {
+             stopAnimation();
+             animation = animate(slider.values[0]);
+             playButton.classList.add("toggled");
+           }
+
+           /**
+           * Stops the animations
+           */
+           function stopAnimation() {
+             if (!animation) {
+               return;
+             }
+
+             animation.remove();
+             animation = null;
+             playButton.classList.remove("toggled");
+            }
+
+           /**
+           * Animates the color visual variable continously
+           */
+           function animate(startValue) {
+             var animating = true;
+             var value = startValue;
+
+             var frame = function (timestamp) {
+               if (!animating) {
+                 return;
+               }
+
+               value += 1;
+               if (value > 2019) {
+                 value = 1869;
+               }
+
+               setYear(value);
+
+               // Update at 30fps
+               setTimeout(function () {
+                 requestAnimationFrame(frame);
+               }, 1000 / 30);
+             };
+
+             frame();
+
+             return {
+               remove: function () {
+                 animating = false;
+               }
+             };
+           }
 
 });
