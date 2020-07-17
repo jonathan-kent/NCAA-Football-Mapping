@@ -28,6 +28,13 @@
         order: 1;
       }
 
+      #titleDiv {
+        font-weight: 400;
+        font-style: normal;
+        font-size: 1.2019rem;
+        padding: 10px;
+      }
+
       #sliderContainer {
         flex: 0 0 80px;
         order: 2;
@@ -100,7 +107,9 @@
   </head>
   <body>
     <div id="applicationDiv">
-      <div id="viewDiv"></div>
+      <div id="viewDiv">
+        <div id="titleDiv" class="esri-widget">NCAA Footbal National Champions</div>
+      </div>
       <div id="sliderContainer" class="esri-widget">
           <span id="sliderValue"></span>
           <div id="sliderInnerContainer">

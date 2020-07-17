@@ -21,6 +21,36 @@ class School {
     return this.weight;
   }
 
+  winsToDate(year){
+    var wins = [];
+    for (let i=0; i<this.wins.length; i++){
+      if (this.wins[i] <= year) wins.push(this.wins[i]);
+      else break;
+    }
+    var formatted = "";
+    for (let i=0; i<wins.length; i++){
+      if (i == wins.length - 1) formatted = formatted + wins[i];
+      else formatted = formatted + wins[i] + ", ";
+    }
+    return formatted;
+  }
+
+  winRank(year){
+    var rank = 1;
+    for (let i=0; i<schools.length; i++){
+      if (schools[i].winsToDate.length > this.winsToDate.length) rank++;
+    }
+    return rank;
+  }
+
+  weightRank(year){
+    var rank = 1;
+    for (let i=0; i<schools.length; i++){
+      if (schools[i].weight > this.weight) rank++;
+    }
+    return rank;
+  }
+
 }
 
 var schools = [new School('Princeton', [1869, 1870, 1872, 1873, 1874, 1875, 1877, 1878, 1879, 1880, 1881, 1884, 1885, 1886, 1889, 1893, 1896, 1898, 1899, 1903, 1906, 1911, 1920, 1922, 1933, 1935], 40.342694, -74.654704),
@@ -99,6 +129,19 @@ function weightedCenter(year){
   return [wgtMeanLat, wgtMeanLong];
 }
 
+function getWinners(year){
+  var winners = [];
+  for (let i=0; i<schools.length; i++){
+    if (schools[i].wins.includes(year)) winners.push(schools[i].name);
+  }
+  var formatted = "";
+  for (let i=0; i<winners.length; i++){
+    if (i == winners.length - 1) formatted = formatted + winners[i];
+    else formatted = formatted + winners[i] + ", ";
+  }
+  return formatted;
+}
+
 
 
 
@@ -107,8 +150,9 @@ require(["esri/Map",
          "esri/layers/FeatureLayer",
          "esri/Graphic",
          "esri/geometry/Point",
-         "esri/widgets/Slider"],
-         function (Map, SceneView, FeatureLayer, Graphic, Point, Slider) {
+         "esri/widgets/Slider",
+         "esri/widgets/Legend"],
+         function (Map, SceneView, FeatureLayer, Graphic, Point, Slider, Legend) {
 
            // Create layers
 
@@ -231,6 +275,15 @@ require(["esri/Map",
            var titleDiv = document.getElementById("titleDiv");
            var animation = null;
 
+           view.ui.components = [ "attribution" ];
+           view.ui.add(titleDiv, "top-left");
+           view.ui.add(
+             new Legend({
+             view: view
+             }),
+             "bottom-left"
+           );
+
            var slider = new Slider({
              container: "slider",
              min: 1869,
@@ -266,6 +319,9 @@ require(["esri/Map",
 
            // methods
            function setYear(value){
+             sliderValue.innerHTML = Math.floor(value);
+             value = Math.floor(value);
+             titleDiv.innerHTML = value + ": " + getWinners(value);
              sliderValue.innerHTML = Math.floor(value);
              slider.viewModel.setValue(0, value);
              schoolLayer.renderer = createSchoolRenderer(value);
@@ -305,33 +361,46 @@ require(["esri/Map",
                       opacity: 0,
                       value: year + 0.1
                     }
-                  ]
+                  ],
+                  legendOptions: {
+                    showLegend: false
+                  }
                 },
                 {
                   type: "color",
                   field: "LASTWIN",
+                  legendOptions: {
+                    title: "Years Since Last Win"
+                  },
                   stops: [
                     {
-                      value: 0,
-                      color: [0, 255, 0]
-                    },
-                    {
-                      value: 5,
-                      color: [255, 255, 0]
+                      value: 115,
+                      color: [255, 0, 0],
+                      label: "115 years"
                     },
                     {
                       value: 50,
-                      color: [255, 100, 0]
+                      color: [255, 100, 0],
+                      label: "50 years"
                     },
                     {
-                      value: 115,
-                      color: [255, 0, 0]
+                      value: 5,
+                      color: [255, 255, 0],
+                      label: "5 years"
+                    },
+                    {
+                      value: 0,
+                      color: [0, 255, 0],
+                      label: "0 years"
                     }
                   ]
                 },
                 {
                   type: "size",
                   field: "WEIGHT",
+                  legendOptions: {
+                    title: "Weighted Wins"
+                  },
                   stops: [
                     {
                       value: 0,
@@ -367,7 +436,7 @@ require(["esri/Map",
                   }
                  ]
                },
-               label: "center location",
+               label: "Weighted Center Location",
                visualVariables: [
                  {
                    type: "opacity",
@@ -385,7 +454,10 @@ require(["esri/Map",
                        opacity: 0,
                        value: year + 0.1
                      }
-                   ]
+                   ],
+                   legendOptions: {
+                     showLegend: false
+                   }
                  }
                ]
              }
